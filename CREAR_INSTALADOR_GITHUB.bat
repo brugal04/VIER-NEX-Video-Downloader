@@ -28,23 +28,7 @@ mkdir release >nul 2>&1
 
 echo.
 echo [3/5] Creando EXE de Windows...
-python -m PyInstaller ^
-  --noconfirm ^
-  --clean ^
-  --onefile ^
-  --windowed ^
-  --name "VIER-NEX Video Downloader" ^
-  --icon "VIERNEX_icon.ico" ^
-  --add-data "VIERNEX_icon.ico;." ^
-  --add-data "VIERNEX_icon.png;." ^
-  --collect-all customtkinter ^
-  --collect-all yt_dlp ^
-  --collect-all imageio_ffmpeg ^
-  --collect-all pystray ^
-  --collect-all winotify ^
-  --collect-all tkinterdnd2 ^
-  --collect-all comtypes ^
-  "VIERNEX_Video_Downloader.py"
+python -m PyInstaller --noconfirm --clean ".\VIER-NEX Video Downloader.spec"
 if errorlevel 1 goto :error
 
 echo.
@@ -86,10 +70,8 @@ if errorlevel 1 goto :error
 
 echo.
 echo [5/5] Generando SHA-256 para GitHub Release...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$f = Get-ChildItem '.\release\VIER-NEX-Video-Downloader-Setup-v0.1.0.exe';" ^
-  "$h = Get-FileHash $f.FullName -Algorithm SHA256;" ^
-  "'SHA256  ' + $h.Hash + '  ' + $f.Name | Set-Content '.\release\SHA256SUMS.txt' -Encoding ASCII"
+python -c "import hashlib,pathlib; p=pathlib.Path(r'release\VIER-NEX-Video-Downloader-Setup-v0.1.0.exe'); h=hashlib.file_digest(open(p,'rb'),'sha256').hexdigest(); pathlib.Path(r'release\SHA256SUMS.txt').write_text(f'{h}  {p.name}\n',encoding='ascii'); print(h)"
+if errorlevel 1 goto :error
 
 echo.
 echo ============================================================
@@ -112,5 +94,6 @@ echo ============================================================
 pause
 exit /b 1
 endlocal
+
 
 
