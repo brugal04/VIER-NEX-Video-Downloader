@@ -1,6 +1,11 @@
+<p align="center"><img src="VIERNEX_icon.png" width="120"></p>
+
 # VIER-NEX Video Downloader
 
 
+
+
+![Captura de VIER-NEX](assets/VIERNEX_screenshot.png)
 
 Aplicación para Windows que permite descargar videos desde YouTube, Facebook, Instagram y TikTok.
 
@@ -79,4 +84,6 @@ cd VIER-NEX-Video-Downloader
 python -m pip install -r requirements.txt
 
 python VIERNEX\_Video\_Downloader.py
+
+
 
