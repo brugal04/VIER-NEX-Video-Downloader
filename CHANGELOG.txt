@@ -1,0 +1,21 @@
+VIER-NEX Video Downloader
+
+v0.1.0
+- Primera versión pública de VIER-NEX Video Downloader.
+- Descarga de videos desde YouTube, Facebook, Instagram y TikTok.
+- Soporte para análisis de enlaces antes de descargar.
+- Modos Auto, 1080p, 720p, MP3, WhatsApp y tamaño personalizado.
+- Cola de descargas e historial de archivos recientes.
+- Soporte para enlaces Facebook Reel, Watch, Share y fb.watch.
+- Normalización y resolución de enlaces compartidos de Facebook.
+- Fallback de sesión de navegador para contenido de Facebook que requiere autenticación.
+- Corregida descarga de videos verticales 1080x1920.
+- Corregido falso diagnóstico de "video privado/eliminado" ante errores de formato.
+- Soporte de impersonación de navegador mediante curl_cffi para TikTok.
+- TikTok validado en la versión Python y en el EXE compilado.
+- YouTube, Instagram, Facebook y TikTok validados después de los cambios.
+- Interfaz con panel rápido, cola, progreso, historial y bandeja del sistema.
+- Manual de usuario PDF integrado.
+- Instalador para Windows mediante Inno Setup.
+- Generación de SHA-256 para releases.
+- Compatible con Windows 10/11 x64.

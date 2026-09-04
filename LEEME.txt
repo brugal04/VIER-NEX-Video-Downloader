@@ -1,0 +1,351 @@
+VIER-NEX Video Downloader v0.1.0
+=================================
+
+Creado por Bryant Brugal
+Proyecto: VIER-NEX
+
+SPRINT COMPLETO
+---------------
+Esta versión integra en un solo sprint:
+
+INTERFAZ / WINDOWS
+- Nueva interfaz dark cyan / blue / purple.
+- Icono de ventana y barra de tareas.
+- Bandeja del sistema.
+- Doble clic en bandeja abre VIER-NEX.
+- Cerrar con X minimiza a bandeja.
+- Menú rápido de bandeja.
+- Notificaciones de Windows con fallback a bandeja.
+- Progreso en barra de tareas cuando Windows/comtypes lo permite.
+- Launcher normal sin consola.
+- Modo Debug separado.
+
+DESCARGAS
+- Twitter/X, TikTok, Instagram, Facebook, Reddit, YouTube, Vimeo, Twitch
+  y otros sitios compatibles con yt-dlp.
+- WhatsApp ~170 MB.
+- Tamaño personalizado.
+- Máxima calidad.
+- Auto / calidad inteligente.
+- 1080p.
+- 720p.
+- MP3.
+- Uso opcional de sesión de Chrome.
+
+ANÁLISIS
+- Análisis del enlace antes de descargar.
+- Título.
+- Plataforma.
+- Resolución.
+- Duración.
+- Tamaño estimado cuando la plataforma lo informa.
+- Salida objetivo estimada.
+
+COLA / LOTE
+- Múltiples enlaces.
+- Cola persistente.
+- Pausar / continuar descarga actual.
+- Cancelar.
+- Reintentar fallidas.
+- Quitar elementos.
+- Limpiar terminadas.
+
+DRAG & DROP
+- Arrastra URLs a la aplicación para añadirlas.
+- Arrastra videos locales para comprimirlos.
+
+PORTAPAPELES
+- Detección automática.
+- Descargar.
+- Descargar en modo WhatsApp.
+- Ignorar.
+- Notificación opcional.
+
+HISTORIAL
+- Archivo.
+- Plataforma.
+- Tamaño.
+- Fecha.
+- Abrir archivo.
+- Abrir carpeta.
+- Copiar URL original.
+- Repetir descarga.
+- Eliminar del historial.
+
+ACERCA DE
+- Nombre.
+- Versión.
+- Creado por Bryant Brugal.
+- Descripción.
+- Tecnologías.
+- Privacidad.
+- Información de versión.
+
+ACTUALIZACIONES
+- Muestra versión instalada de yt-dlp.
+- Consulta versión actual disponible.
+- Actualización automática de yt-dlp cuando se ejecuta desde Python.
+- En el EXE, el motor está integrado y se actualiza al generar una nueva versión.
+
+PRIVACIDAD
+- Procesamiento local.
+- Sin telemetría.
+- El historial no se envía fuera de la PC.
+
+PRIMERA VEZ
+-----------
+1. Descomprime el ZIP.
+2. Ejecuta:
+   INSTALAR_PRIMERA_VEZ.bat
+
+Después de la instalación, usa:
+   ABRIR_VIER_NEX.vbs
+
+Ese launcher abre la interfaz SIN consola.
+
+MODO DEBUG
+----------
+Si algo falla:
+   ABRIR_MODO_DEBUG.bat
+
+También revisa:
+C:\Users\TU_USUARIO\AppData\Local\VIER-NEX Video Downloader\startup_error.txt
+
+CREAR EXE
+---------
+Ejecuta:
+   CREAR_EXE_WINDOWS.bat
+
+Resultado:
+dist\VIER-NEX Video Downloader.exe
+
+CORRECCIÓN v0.1.0
+-----------------
+- Corregido fallo de arranque de las tarjetas de modos de descarga.
+- Mantiene todas las funciones del sprint anterior.
+- Mensaje de error de inicio ahora muestra también la excepción principal.
+
+IMPORTANTE
+----------
+Como ya instalaste las dependencias, normalmente NO necesitas volver a
+instalarlas. Puedes abrir directamente ABRIR_VIER_NEX.vbs.
+
+Si quieres validar con consola, usa ABRIR_MODO_DEBUG.bat.
+
+CORRECCIÓN v0.1.0 - ACERCA DE
+-----------------------------
+- La ventana Acerca de ahora es única.
+- Si ya está abierta, volver a pulsar Acerca de solo la trae al frente.
+- Eliminados los botones Minimizar y Maximizar de Acerca de.
+- La ventana Acerca de mantiene únicamente la X para cerrar.
+- Tamaño fijo: no se puede redimensionar.
+
+CORRECCIÓN v0.1.0 - LOGO / ICONO INTERNO
+----------------------------------------
+- Se mantiene el icono original para Windows, barra de tareas y bandeja.
+- Dentro de la interfaz se reutiliza el mismo recurso, recortando el marco pesado en tiempo real.
+- Header: logo más pequeño y mejor alineado.
+- Acerca de: logo más limpio y reducido.
+- No se añadió ni generó ningún archivo de imagen nuevo.
+
+NUEVA FUNCIÓN v0.1.0 - DURACIÓN DEL CLIP
+----------------------------------------
+Antes de descargar puedes elegir:
+- Completo
+- 15 segundos
+- 30 segundos
+- 1 minuto
+- 3 minutos
+- 5 minutos
+
+Los clips comienzan desde 00:00.
+Cada elemento de la cola conserva su propia duración.
+WhatsApp y tamaño personalizado siguen funcionando sobre el clip seleccionado.
+
+CORRECCIÓN v0.1.0 - INTERFAZ + RENDIMIENTO
+------------------------------------------
+- Tarjetas de modo reorganizadas en 3 columnas x 2 filas.
+- Ya no hay que maximizar la app para leer WhatsApp / Auto / Máxima / 1080p / 720p / MP3.
+- Reducidos redibujos de CustomTkinter durante descargas.
+- La cola ya no se destruye y reconstruye en cada callback de progreso.
+- Progreso visual limitado a ~10 actualizaciones por segundo.
+- Actualización de la cola limitada a unas pocas veces por segundo.
+- Redimensionado de ventana desacoplado de trabajo pesado.
+- Menos elementos visibles simultáneamente en la cola para mantener fluidez.
+- Nombres muy largos se recortan visualmente en Descargas recientes.
+
+CORRECCIÓN v0.1.0 - AVISO DE SEGUNDO PLANO
+------------------------------------------
+- La notificación "VIER-NEX continúa ejecutándose en segundo plano" aparece una sola vez.
+- Después de mostrarse, queda guardado en los ajustes locales.
+- Cerrar la ventana sigue enviando la app a la bandeja, pero sin repetir el aviso.
+
+CORRECCIÓN v0.1.0 - ARRANQUE
+----------------------------
+- Corregido TypeError: ModeCard.__init__() got multiple values for argument 'callback'.
+- Mantiene todas las mejoras de las versiones internas anteriores.
+- Sin cambios en duración de clips, rendimiento, bandeja ni notificaciones.
+
+CORRECCIÓN v0.1.0 - MODOS / BANDEJA / RESTAURACIÓN
+--------------------------------------------------
+1. MODOS DE DESCARGA
+- Rediseñados completamente.
+- 3 columnas x 2 filas.
+- Sin iconos encajonados.
+- Sin textos cortados.
+- Cada tarjeta muestra claramente nombre y descripción.
+
+2. AVISO DE SEGUNDO PLANO
+- Ahora usa settings.json + un archivo marcador persistente.
+- Se muestra únicamente la primera vez.
+- No vuelve a aparecer al cerrar/restaurar la aplicación.
+
+3. FLASH BLANCO AL RESTAURAR
+- Causa: Windows hacía visible la superficie Tk antes de terminar el repintado de CustomTkinter.
+- La ventana ahora se restaura invisible (alpha 0).
+- CustomTkinter termina el repintado.
+- Después se muestra completa (alpha 1).
+- También se evita ejecutar lógica de resize durante ese ciclo.
+
+REDISEÑO v0.1.0 - INTERFAZ COMPACTA CON ICONOS
+----------------------------------------------
+- Eliminados los números de los encabezados.
+- Cada sección usa un icono representativo.
+- Duración: tiles compactos, más cuadrados y sin bordes.
+- Modo de descarga: tiles visuales con icono, nombre y descripción.
+- Eliminadas abreviaturas visuales grandes tipo WA/AUTO/MAX/FHD/HD.
+- Espaciado vertical reducido.
+- Header más compacto.
+- Acciones, progreso y log más bajos.
+- Ventana inicial ajustada a 1180x720 para que la mayor cantidad de contenido
+  quede visible desde el arranque sin maximizar.
+
+AJUSTE v0.1.0 - LEGIBILIDAD + ICONOS
+------------------------------------
+- Aumentado el tamaño de letras en secciones clave.
+- Información previa más legible.
+- Duración del video con botones más altos y claros.
+- Modo de descarga con iconos renovados y textos más grandes.
+- Ajuste fino visual sin romper la interfaz compacta.
+
+ACTUALIZACIÓN v0.1.0
+--------------------
+- Iconos vectoriales nativos de Windows (Segoe MDL2 Assets).
+- Cada icono tiene color según su función.
+- Letras más grandes en títulos, duración, modos y opciones.
+- "Duración del video" -> "Duración de Video".
+- "Completo" -> "Full".
+- Eliminado el handler custom de resize.
+- Menos frecuencia de refresco de progreso/cola.
+- Eliminado el restore basado en alpha.
+- Restauración desde bandeja fuera de pantalla y luego presentación completa.
+- Conserva el estado maximizado previo.
+
+HOTFIX v0.1.0 - INSTANCIA ÚNICA
+-------------------------------
+- La app ahora permite una sola instancia activa.
+- Si la intentas abrir otra vez, no crea otra ventana ni otro icono en la bandeja.
+- En su lugar, trae al frente la instancia que ya está corriendo.
+
+HOTFIX v0.1.0 - CURSOR DE BOTONES
+---------------------------------
+- Los tiles de Duración de Video ahora muestran cursor de mano.
+- Los tiles de Modo de descarga ahora muestran cursor de mano.
+- El cursor cambia también encima del icono, título y subtítulo.
+- No se modificó la lógica de descarga.
+
+HOTFIX v0.1.0 - EFECTO HOVER
+----------------------------
+- Duración de Video: efecto visual al pasar el mouse.
+- Modo de descarga: efecto visual al pasar el mouse.
+- El tile se ilumina y gana contraste.
+- Icono y texto se vuelven más visibles durante hover.
+- El estado seleccionado conserva un color distinto.
+
+ACTUALIZACIÓN v0.1.0
+--------------------
+INTERFAZ
+- Corregidos subtítulos cortados en Modo de descarga.
+- Aumentada la altura de los tiles de modo.
+- Aumentadas las fuentes de todo el Panel rápido.
+- Cola de descargas y Descargas recientes ahora tienen textos claramente más grandes.
+- Botones del panel derecho también aumentaron de tamaño.
+
+FACEBOOK
+- Normaliza enlaces móviles de Facebook.
+- Intenta resolver enlaces fb.watch / share antes de descargar.
+- Si Facebook requiere autenticación, muestra un mensaje claro.
+- Al activar "Usar sesión del navegador", Facebook puede usar Chrome y luego Edge como fallback.
+
+INSTALADOR / GITHUB
+- Nuevo CREAR_INSTALADOR_GITHUB.bat.
+- Construye el EXE con PyInstaller.
+- Instala/localiza Inno Setup 6.
+- Genera un instalador profesional de Windows.
+- Genera SHA256SUMS.txt.
+- Todo queda en la carpeta release listo para GitHub Releases.
+
+HOTFIX v0.1.0 - ACERCA DE + REDIMENSIONADO
+------------------------------------------
+- "Acerca de" se movió al header superior; ya no aparece como funcionalidad.
+- El cuerpo pesado de CustomTkinter ya no cambia de tamaño píxel a píxel.
+- Durante el drag de los bordes, el layout interno mantiene su tamaño.
+- Al terminar el drag, el contenido se adapta una sola vez.
+- Se suspenden reconstrucciones de cola y progreso visual mientras se redimensiona.
+- Esto reduce notablemente el trabajo de repintado al maximizar o agrandar la ventana.
+
+ACTUALIZACIÓN v0.1.0 - MANUAL DE USUARIO
+-----------------------------------------
+- Acerca de incluye un botón para abrir el Manual de Usuario en PDF.
+- El manual explica todas las funciones principales del programa.
+- El PDF se incluye en la carpeta del proyecto.
+- El instalador de GitHub instala el manual junto al EXE.
+- CREAR_EXE_WINDOWS.bat copia el manual junto al EXE standalone.
+- Corregido un error de inicio causado por width/height en CTk .place().
+- Se conserva la optimización de redimensionado.
+
+HOTFIX v0.1.0 - LAYOUT RESPONSIVO
+---------------------------------
+- Corregida la distorsión/aplastamiento visual detectada durante el desarrollo.
+- Eliminado el uso de place() para dimensionar manualmente el cuerpo principal.
+- El layout principal vuelve a Grid responsivo.
+- Las columnas mantienen anchos mínimos para evitar textos y botones aplastados.
+- Maximizar, restaurar y cambiar el tamaño vuelve a recalcularse correctamente.
+- Se conserva la optimización segura: cola/progreso pausan repintados mientras se redimensiona.
+- El Manual de Usuario PDF y el botón Acerca de permanecen integrados.
+
+ACTUALIZACIÓN v0.1.0 - ACERCA DE COMPLETO
+------------------------------------------
+- Rehecha completamente la ventana Acerca de.
+- Eliminada la descripción genérica "Descargador multimedia".
+- Nueva explicación clara de qué es VIER-NEX Video Downloader.
+- Añadidas funciones principales, plataformas, privacidad y tecnologías.
+- Se muestra la versión actual de yt-dlp.
+- El Manual de Usuario tiene una sección propia con descripción.
+- Botones de versión y actualización reorganizados.
+
+HOTFIX v0.1.0 - ACERCA DE MÁS LEGIBLE
+-------------------------------------
+- Aumentada la tipografía completa de la ventana Acerca de.
+- Título principal más grande.
+- Descripción principal más grande.
+- Funciones, plataformas, privacidad y tecnologías ahora usan fuente mayor.
+- Ayuda/documentación y texto legal también aumentados.
+- Botones inferiores más altos y con texto mayor.
+- Ventana Acerca de ampliada para evitar que el contenido quede apretado.
+
+VERSIÓN v0.1.0 - FLUID RESIZE
+-----------------------------
+- Rehecha la arquitectura de redimensionado después de investigar CustomTkinter.
+- Windows redimensiona ahora un host nativo de Tk inmediatamente.
+- El workspace pesado de CustomTkinter recibe tamaños coalescidos a una cadencia limitada.
+- Ya no se obliga a todos los Canvas de CustomTkinter a redibujarse por cada píxel del mouse.
+- Al terminar el resize se aplica exactamente el tamaño final.
+- Cola y progreso siguen evitando repintados durante el resize.
+- El contenido tiene un ancho máximo de 1540 px para evitar Canvas gigantes en monitores anchos.
+- requirements.txt ahora usa CustomTkinter 6.x.
+- Nuevo ACTUALIZAR_MOTOR_INTERFAZ.bat para actualizar CustomTkinter con un clic.
+- Nuevo DIAGNOSTICO_RENDER_UI.bat para obtener Python/Tk/CustomTkinter/DPI si fuera necesario.
+
+
+

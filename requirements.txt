@@ -1,0 +1,9 @@
+customtkinter>=6.0.0,<7
+yt-dlp[default,curl-cffi]
+imageio-ffmpeg
+pystray
+pillow
+winotify
+tkinterdnd2
+comtypes
+pyinstaller
