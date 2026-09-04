@@ -840,9 +840,16 @@ class VierNexApp(BaseRoot):
         self.tray_icon = None
         self.tray_thread = None
         self.about_win = None
-        self.clipboard_stop = threading.Event()
-        self.clipboard_thread = None
         self.last_clipboard_url = ""
+        self._clipboard_after_id = None   # ID devuelto por self.after()
+        self._uiq_after_id = None
+        self._queue_refresh_after_id = None
+        self._prime_layout_after_id = None
+        self._start_tray_after_id = None
+        self._start_clipboard_monitor_after_id = None
+        self._ensure_worker_after_id = None
+        self._taskbar_clear_after_id = None
+        self._shutting_down = False
 
         self.mode_var = ctk.StringVar(value=self.settings_data.get("mode", "whatsapp"))
         self.clip_duration_var = ctk.StringVar(value=self.settings_data.get("clip_duration", "full"))
@@ -896,10 +903,10 @@ class VierNexApp(BaseRoot):
         self._try_clipboard_once()
         self._start_instance_listener()
 
-        self.after(125, self._poll_uiq)
-        self.after(600, self._start_tray)
-        self.after(900, self._start_clipboard_monitor)
-        self.after(1200, self._ensure_worker)
+        self._uiq_after_id = self.after(125, self._poll_uiq)
+        self._start_tray_after_id = self.after(600, self._start_tray)
+        self._start_clipboard_monitor_after_id = self.after(900, self._start_clipboard_monitor)
+        self._ensure_worker_after_id = self.after(1200, self._ensure_worker)
 
     def _schedule_body_layout(self, event):
         # Compatibility alias. Resize events now come only from the lightweight
@@ -986,6 +993,10 @@ class VierNexApp(BaseRoot):
             pass
 
     def _prime_body_layout(self):
+        # Clear stored after id for prime layout
+        self._prime_layout_after_id = None
+        if getattr(self, "_shutting_down", False):
+            return
         if self.body_host is None:
             return
         self.update_idletasks()
@@ -1086,7 +1097,7 @@ class VierNexApp(BaseRoot):
         body.grid_rowconfigure(0, weight=1)
 
         # First exact geometry pass after Tk has measured the native host.
-        self.after_idle(self._prime_body_layout)
+        self._prime_layout_after_id = self.after_idle(self._prime_body_layout)
 
         left = ctk.CTkScrollableFrame(
             body,
@@ -1813,7 +1824,7 @@ class VierNexApp(BaseRoot):
         if self._resize_in_progress:
             if not self._queue_refresh_pending:
                 self._queue_refresh_pending = True
-                self.after(180, self._run_scheduled_queue_refresh)
+                self._queue_refresh_after_id = self.after(180, self._run_scheduled_queue_refresh)
             return
 
         now = time.monotonic()
@@ -1828,11 +1839,13 @@ class VierNexApp(BaseRoot):
         if not self._queue_refresh_pending:
             self._queue_refresh_pending = True
             delay_ms = max(40, int((min_interval - elapsed) * 1000))
-            self.after(delay_ms, self._run_scheduled_queue_refresh)
+            self._queue_refresh_after_id = self.after(delay_ms, self._run_scheduled_queue_refresh)
 
     def _run_scheduled_queue_refresh(self):
+        # Clear stored after id for this scheduled run
+        self._queue_refresh_after_id = None
         if self._resize_in_progress:
-            self.after(200, self._run_scheduled_queue_refresh)
+            self._queue_refresh_after_id = self.after(200, self._run_scheduled_queue_refresh)
             return
         self._queue_refresh_pending = False
         self._last_queue_refresh = time.monotonic()
@@ -1901,6 +1914,10 @@ class VierNexApp(BaseRoot):
         ctk.CTkButton(win, text="Añadir a cola", fg_color=BLUE, command=add).pack(fill="x", padx=18, pady=(4, 16))
 
     def _ensure_worker(self):
+        # Clear scheduled after id (if started via after)
+        self._ensure_worker_after_id = None
+        if getattr(self, "_shutting_down", False):
+            return
         if self.worker_thread and self.worker_thread.is_alive():
             return
         if not any(j.get("status") in ("queued", "retry") for j in self.jobs):
@@ -2348,22 +2365,32 @@ class VierNexApp(BaseRoot):
 
     # ---------------- Clipboard ----------------
     def _start_clipboard_monitor(self):
-        if self.clipboard_thread and self.clipboard_thread.is_alive():
+        # Clear scheduled after id (if started via after)
+        self._start_clipboard_monitor_after_id = None
+        if getattr(self, "_shutting_down", False):
             return
-        self.clipboard_thread = threading.Thread(target=self._clipboard_loop, daemon=True)
-        self.clipboard_thread.start()
+        # Start clipboard polling via Tkinter mainloop; do not create background threads.
+        if getattr(self, "_clipboard_after_id", None) is not None:
+            return
+        # Schedule first poll ~1s after start. _try_clipboard_once() is called during init.
+        self._clipboard_after_id = self.after(1000, self._clipboard_poll)
 
-    def _clipboard_loop(self):
-        while not self.clipboard_stop.is_set():
-            try:
-                if self.clip_monitor_var.get():
-                    text = self.clipboard_get().strip()
-                    if is_url(text) and text != self.last_clipboard_url:
-                        self.last_clipboard_url = text
-                        self.uiq.put(("clipboard", text))
-            except Exception:
-                pass
-            time.sleep(1.0)
+    def _clipboard_poll(self):
+        # Executed on the main thread via after. Clear current after id when running.
+        try:
+            self._clipboard_after_id = None
+            if self.clip_monitor_var.get():
+                text = self.clipboard_get().strip()
+                if is_url(text) and text != self.last_clipboard_url:
+                    self.last_clipboard_url = text
+                    self.uiq.put(("clipboard", text))
+        except Exception:
+            pass
+        # Re-schedule next poll (approx. 1s)
+        try:
+            self._clipboard_after_id = self.after(1000, self._clipboard_poll)
+        except Exception:
+            self._clipboard_after_id = None
 
     def _try_clipboard_once(self):
         try:
@@ -2561,7 +2588,10 @@ class VierNexApp(BaseRoot):
                 msg = ""
 
             if msg == "SHOW":
-                self.after(0, self._show_existing_instance)
+                try:
+                    self.uiq.put(("show_existing_instance", None))
+                except Exception:
+                    pass
 
     def _show_existing_instance(self):
         try:
@@ -2624,20 +2654,24 @@ class VierNexApp(BaseRoot):
             return img
 
     def _start_tray(self):
+        # Clear scheduled after id (if started via after)
+        self._start_tray_after_id = None
+        if getattr(self, "_shutting_down", False):
+            return
         if pystray is None or self.tray_icon is not None:
             return
         menu = pystray.Menu(
-            pystray.MenuItem("Abrir VIER-NEX", lambda icon,item: self.after(0, self.show_from_tray), default=True),
-            pystray.MenuItem("Pegar y descargar", lambda icon,item: self.after(0, lambda: self._enqueue_clipboard(False))),
-            pystray.MenuItem("Descargar para WhatsApp", lambda icon,item: self.after(0, lambda: self._enqueue_clipboard(True))),
-            pystray.MenuItem("Comprimir archivo", lambda icon,item: self.after(0, self._compress_existing)),
+            pystray.MenuItem("Abrir VIER-NEX", lambda icon,item: self.uiq.put(("show_from_tray", None)), default=True),
+            pystray.MenuItem("Pegar y descargar", lambda icon,item: self.uiq.put(("enqueue_clipboard", False))),
+            pystray.MenuItem("Descargar para WhatsApp", lambda icon,item: self.uiq.put(("enqueue_clipboard", True))),
+            pystray.MenuItem("Comprimir archivo", lambda icon,item: self.uiq.put(("compress_existing", None))),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Historial", lambda icon,item: self.after(0, self._history_window)),
-            pystray.MenuItem("Abrir carpeta", lambda icon,item: self.after(0, self._open_folder)),
-            pystray.MenuItem("Ajustes", lambda icon,item: self.after(0, self._settings)),
-            pystray.MenuItem("Acerca de", lambda icon,item: self.after(0, self._about)),
+            pystray.MenuItem("Historial", lambda icon,item: self.uiq.put(("history_window", None))),
+            pystray.MenuItem("Abrir carpeta", lambda icon,item: self.uiq.put(("open_folder", None))),
+            pystray.MenuItem("Ajustes", lambda icon,item: self.uiq.put(("settings", None))),
+            pystray.MenuItem("Acerca de", lambda icon,item: self.uiq.put(("about", None))),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Salir", lambda icon,item: self.after(0, self.exit_app)),
+            pystray.MenuItem("Salir", lambda icon,item: self.uiq.put(("exit_app", None))),
         )
         self.tray_icon = pystray.Icon("VIERNEXVideoDownloader", self._tray_image(), APP_NAME, menu)
         self.tray_thread = threading.Thread(target=self.tray_icon.run, daemon=True)
@@ -3142,10 +3176,31 @@ class VierNexApp(BaseRoot):
 
 
     def exit_app(self):
+        # Mark shutting down to avoid re-scheduling callbacks
+        self._shutting_down = True
         self.stop_worker.set()
-        self.clipboard_stop.set()
         self.pause_event.set()
-        self.taskbar.clear()
+        # Clear taskbar immediately
+        try:
+            self.taskbar.clear()
+        except Exception:
+            pass
+
+        # Cancel our tracked after callbacks
+        for aid_name in ("_clipboard_after_id", "_uiq_after_id", "_queue_refresh_after_id",
+                         "_start_tray_after_id", "_start_clipboard_monitor_after_id", "_ensure_worker_after_id",
+                         "_prime_layout_after_id", "_taskbar_clear_after_id", "_body_resize_job", "_resize_after_id"):
+            aid = getattr(self, aid_name, None)
+            if aid is not None:
+                try:
+                    self.after_cancel(aid)
+                except Exception:
+                    pass
+                try:
+                    setattr(self, aid_name, None)
+                except Exception:
+                    pass
+
         if self._instance_server:
             try:
                 self._instance_server.close()
@@ -3161,7 +3216,11 @@ class VierNexApp(BaseRoot):
 
     # ---------------- UI queue ----------------
     def _poll_uiq(self):
+        # Running on main thread via after. Clear stored after id and honor shutdown flag.
         try:
+            self._uiq_after_id = None
+            if getattr(self, "_shutting_down", False):
+                return
             while True:
                 item = self.uiq.get_nowait()
                 kind = item[0]
@@ -3234,7 +3293,16 @@ class VierNexApp(BaseRoot):
                     self.progress_label.configure(text="100%")
                     self.status_var.set("Completado")
                     self.taskbar.set(100, TBPF_NORMAL)
-                    self.after(1600, self.taskbar.clear)
+                    # schedule taskbar clear via tracked after id
+                    try:
+                        if getattr(self, "_taskbar_clear_after_id", None) is not None:
+                            try:
+                                self.after_cancel(self._taskbar_clear_after_id)
+                            except Exception:
+                                pass
+                        self._taskbar_clear_after_id = self.after(1600, self.taskbar.clear)
+                    except Exception:
+                        self._taskbar_clear_after_id = None
                     self._refresh_recent()
                     self._refresh_queue()
                     self._log(f'Listo: {rec["name"]}')
@@ -3248,7 +3316,15 @@ class VierNexApp(BaseRoot):
                     self.progress.set(0)
                     self.progress_label.configure(text="0%")
                     self.taskbar.set(100, TBPF_ERROR)
-                    self.after(2500, self.taskbar.clear)
+                    try:
+                        if getattr(self, "_taskbar_clear_after_id", None) is not None:
+                            try:
+                                self.after_cancel(self._taskbar_clear_after_id)
+                            except Exception:
+                                pass
+                        self._taskbar_clear_after_id = self.after(2500, self.taskbar.clear)
+                    except Exception:
+                        self._taskbar_clear_after_id = None
                     self._log(f"ERROR: {err}")
                     self._notify("Error de descarga", str(err)[:180])
 
@@ -3275,10 +3351,66 @@ class VierNexApp(BaseRoot):
                     self._notify(title, msg)
                     messagebox.showinfo(title, msg)
 
+                # Events enqueued from other threads (instance/tray)
+                elif kind == "show_existing_instance":
+                    self._show_existing_instance()
+
+                elif kind == "show_from_tray":
+                    self.show_from_tray()
+
+                elif kind == "enqueue_clipboard":
+                    try:
+                        self._enqueue_clipboard(item[1])
+                    except Exception:
+                        try:
+                            self._enqueue_clipboard(False)
+                        except Exception:
+                            pass
+
+                elif kind == "compress_existing":
+                    try:
+                        self._compress_existing()
+                    except Exception:
+                        pass
+
+                elif kind == "history_window":
+                    try:
+                        self._history_window()
+                    except Exception:
+                        pass
+
+                elif kind == "open_folder":
+                    try:
+                        self._open_folder()
+                    except Exception:
+                        pass
+
+                elif kind == "settings":
+                    try:
+                        self._settings()
+                    except Exception:
+                        pass
+
+                elif kind == "about":
+                    try:
+                        self._about()
+                    except Exception:
+                        pass
+
+                elif kind == "exit_app":
+                    # Ensure we stop processing and let exit_app handle destruction
+                    self.exit_app()
+                    return
+
         except queue.Empty:
             pass
-        self.after(100, self._poll_uiq)
-
+        # Re-schedule unless shutting down
+        if getattr(self, "_shutting_down", False):
+            return
+        try:
+            self._uiq_after_id = self.after(100, self._poll_uiq)
+        except Exception:
+            self._uiq_after_id = None
 
 def _notify_existing_instance_to_show():
     try:
