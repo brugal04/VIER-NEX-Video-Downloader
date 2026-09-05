@@ -10,6 +10,7 @@ import shutil
 import threading
 import subprocess
 import socket
+import tempfile
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, parse_qsl, urlencode, urlunparse, unquote
@@ -816,6 +817,7 @@ class VierNexApp(BaseRoot):
                 job["status"] = "queued"
 
         self.uiq = queue.Queue()
+        self._queue_lock = threading.RLock()
         self.worker_thread = None
         self.stop_worker = threading.Event()
         self.pause_event = threading.Event()
@@ -1594,7 +1596,31 @@ class VierNexApp(BaseRoot):
                 pass
 
     def _save_queue(self):
-        safe_json_save(QUEUE_FILE, self.jobs)
+        with self._queue_lock:
+            temp_path = None
+            try:
+                QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=f"{QUEUE_FILE.name}.",
+                    suffix=".tmp",
+                    dir=str(QUEUE_FILE.parent)
+                )
+                os.close(fd)
+                temp_path = Path(temp_name)
+                temp_path.write_text(
+                    json.dumps(self.jobs, ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                os.replace(temp_path, QUEUE_FILE)
+                temp_path = None
+            except Exception:
+                pass
+            finally:
+                if temp_path is not None:
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
     def _target_mb(self, mode=None):
         mode = mode or self.mode_var.get()
@@ -1875,8 +1901,9 @@ class VierNexApp(BaseRoot):
         if not is_url(u):
             messagebox.showwarning(APP_NAME, "Pega un enlace válido.")
             return
-        self.jobs.append(self._job_from_url(u))
-        self._save_queue()
+        with self._queue_lock:
+            self.jobs.append(self._job_from_url(u))
+            self._save_queue()
         self._refresh_queue()
         self._log(f"Añadido a cola: {detect_platform(u)}")
         self._ensure_worker()
@@ -1903,9 +1930,10 @@ class VierNexApp(BaseRoot):
 
         def add():
             lines = [x.strip() for x in tb.get("1.0", "end").splitlines() if is_url(x.strip())]
-            for u in lines:
-                self.jobs.append(self._job_from_url(u))
-            self._save_queue()
+            with self._queue_lock:
+                for u in lines:
+                    self.jobs.append(self._job_from_url(u))
+                self._save_queue()
             self._refresh_queue()
             self._ensure_worker()
             win.destroy()
@@ -1920,46 +1948,58 @@ class VierNexApp(BaseRoot):
             return
         if self.worker_thread and self.worker_thread.is_alive():
             return
-        if not any(j.get("status") in ("queued", "retry") for j in self.jobs):
+        with self._queue_lock:
+            has_pending_jobs = any(
+                j.get("status") in ("queued", "retry")
+                for j in self.jobs
+            )
+        if not has_pending_jobs:
             return
         self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self.worker_thread.start()
 
     def _worker_loop(self):
         while not self.stop_worker.is_set():
-            job = next((j for j in self.jobs if j.get("status") in ("queued", "retry")), None)
-            if not job:
-                break
-            self.current_job_id = job["id"]
-            self.cancel_current = False
-            self.pause_event.set()
-            job["status"] = "downloading"
-            job["progress"] = 0
-            self._save_queue()
+            with self._queue_lock:
+                job = next((j for j in self.jobs if j.get("status") in ("queued", "retry")), None)
+                if not job:
+                    break
+                self.current_job_id = job["id"]
+                self.cancel_current = False
+                self.pause_event.set()
+                job["status"] = "downloading"
+                job["progress"] = 0
+                self._save_queue()
             self.uiq.put(("queue_refresh",))
             self.uiq.put(("job_start", job))
             try:
                 record = self._download_job(job)
-                job["status"] = "done"
-                job["progress"] = 100
+                with self._queue_lock:
+                    job["status"] = "done"
+                    job["progress"] = 100
                 self.history.insert(0, record)
                 self.history = self.history[:200]
                 safe_json_save(HISTORY_FILE, self.history)
                 self.uiq.put(("job_done", job, record))
             except Exception as e:
-                if self.cancel_current:
-                    job["status"] = "cancelled"
-                    job["error"] = "Cancelado por el usuario."
+                with self._queue_lock:
+                    cancelled = self.cancel_current
+                    if cancelled:
+                        job["status"] = "cancelled"
+                        job["error"] = "Cancelado por el usuario."
+                    else:
+                        job["status"] = "error"
+                        job["error"] = str(e)
+                if cancelled:
                     self.uiq.put(("job_cancelled", job))
                 else:
-                    job["status"] = "error"
-                    job["error"] = str(e)
                     self.uiq.put(("job_error", job, str(e)))
             finally:
-                self._save_queue()
+                with self._queue_lock:
+                    self._save_queue()
+                    self.current_job_id = None
+                    self.cancel_current = False
                 self.uiq.put(("queue_refresh",))
-                self.current_job_id = None
-                self.cancel_current = False
                 self.pause_event.set()
 
     def _download_job(self, job):
@@ -1974,10 +2014,14 @@ class VierNexApp(BaseRoot):
 
         def hook(data):
             while not self.pause_event.is_set():
-                if self.cancel_current:
+                with self._queue_lock:
+                    cancelled = self.cancel_current
+                if cancelled:
                     raise yt_dlp.utils.DownloadCancelled("Cancelado")
                 time.sleep(0.15)
-            if self.cancel_current:
+            with self._queue_lock:
+                cancelled = self.cancel_current
+            if cancelled:
                 raise yt_dlp.utils.DownloadCancelled("Cancelado")
             status = data.get("status")
             if status == "downloading":
@@ -1986,7 +2030,8 @@ class VierNexApp(BaseRoot):
                     pct = float(raw.replace("%", "").strip())
                 except Exception:
                     pct = 0
-                job["progress"] = pct
+                with self._queue_lock:
+                    job["progress"] = pct
                 speed = re.sub(r"\x1b\[[0-9;]*m", "", data.get("_speed_str", "") or "")
                 eta = re.sub(r"\x1b\[[0-9;]*m", "", data.get("_eta_str", "") or "")
                 self.uiq.put(("progress", job["id"], pct, f"{speed} · ETA {eta}".strip(" ·")))
@@ -2144,7 +2189,8 @@ class VierNexApp(BaseRoot):
         final = src
         target = job.get("target_mb")
         if mode in ("whatsapp", "custom") and src.suffix.lower() != ".mp3":
-            job["status"] = "compressing"
+            with self._queue_lock:
+                job["status"] = "compressing"
             self.uiq.put(("queue_refresh",))
             self.uiq.put(("status", f"Comprimiendo a ~{target} MB..."))
             final = self._compress_to_target(src, duration, ffmpeg, folder, int(target))
@@ -2248,7 +2294,9 @@ class VierNexApp(BaseRoot):
         return int(m.group(1))*3600 + int(m.group(2))*60 + float(m.group(3))
 
     def _toggle_pause(self):
-        if not self.current_job_id:
+        with self._queue_lock:
+            current_job_id = self.current_job_id
+        if not current_job_id:
             return
         if self.pause_event.is_set():
             self.pause_event.clear()
@@ -2261,32 +2309,40 @@ class VierNexApp(BaseRoot):
             self.status_var.set("Continuando...")
 
     def _cancel(self):
-        if self.current_job_id:
-            self.cancel_current = True
+        with self._queue_lock:
+            current_job_id = self.current_job_id
+            if current_job_id is not None:
+                self.cancel_current = True
+        if current_job_id is not None:
             self.pause_event.set()
             self.status_var.set("Cancelando...")
 
     def _retry_job(self, job_id):
-        for j in self.jobs:
-            if j["id"] == job_id:
-                j["status"] = "retry"
-                j["error"] = ""
-                j["progress"] = 0
-        self._save_queue()
+        with self._queue_lock:
+            for j in self.jobs:
+                if j["id"] == job_id:
+                    j["status"] = "retry"
+                    j["error"] = ""
+                    j["progress"] = 0
+            self._save_queue()
         self._refresh_queue()
         self._ensure_worker()
 
     def _remove_job(self, job_id):
-        if job_id == self.current_job_id:
+        with self._queue_lock:
+            active = job_id == self.current_job_id
+            if not active:
+                self.jobs = [j for j in self.jobs if j["id"] != job_id]
+                self._save_queue()
+        if active:
             messagebox.showinfo(APP_NAME, "Cancela la descarga actual antes de eliminarla.")
             return
-        self.jobs = [j for j in self.jobs if j["id"] != job_id]
-        self._save_queue()
         self._refresh_queue()
 
     def _clear_finished(self):
-        self.jobs = [j for j in self.jobs if j.get("status") not in ("done", "cancelled")]
-        self._save_queue()
+        with self._queue_lock:
+            self.jobs = [j for j in self.jobs if j.get("status") not in ("done", "cancelled")]
+            self._save_queue()
         self._refresh_queue()
 
     # ---------------- Existing file / DnD ----------------
@@ -2351,14 +2407,16 @@ class VierNexApp(BaseRoot):
                 urls.append(item)
             elif Path(item).exists():
                 local_files.append(item)
-        for u in urls:
-            self.jobs.append(self._job_from_url(u))
+        with self._queue_lock:
+            for u in urls:
+                self.jobs.append(self._job_from_url(u))
+            if urls:
+                self._save_queue()
         for f in local_files:
             suffix = Path(f).suffix.lower()
             if suffix in (".mp4", ".mkv", ".webm", ".mov", ".avi"):
                 self._compress_existing(f)
         if urls:
-            self._save_queue()
             self._refresh_queue()
             self._ensure_worker()
             self._log(f"Drag & Drop: {len(urls)} enlace(s) añadido(s).")
@@ -2411,8 +2469,9 @@ class VierNexApp(BaseRoot):
         if not is_url(u):
             return
         mode = "whatsapp" if whatsapp else self.mode_var.get()
-        self.jobs.append(self._job_from_url(u, mode=mode))
-        self._save_queue()
+        with self._queue_lock:
+            self.jobs.append(self._job_from_url(u, mode=mode))
+            self._save_queue()
         self._refresh_queue()
         self._ensure_worker()
 
@@ -2497,8 +2556,9 @@ class VierNexApp(BaseRoot):
             job = self._job_from_url(rec["url"], mode=rec.get("mode") or "max")
             job["clip_duration"] = rec.get("clip_duration", "full")
             job["clip_seconds"] = rec.get("clip_seconds")
-            self.jobs.append(job)
-            self._save_queue()
+            with self._queue_lock:
+                self.jobs.append(job)
+                self._save_queue()
             self._refresh_queue()
             self._ensure_worker()
 
@@ -2514,7 +2574,9 @@ class VierNexApp(BaseRoot):
     def _refresh_queue(self):
         for w in self.queue_frame.winfo_children():
             w.destroy()
-        visible = self.jobs[-8:]
+        with self._queue_lock:
+            visible = [dict(job) for job in self.jobs[-8:]]
+            current_job_id = self.current_job_id
         if not visible:
             ctk.CTkLabel(self.queue_frame, text="Cola vacía.", text_color=MUTED).grid(row=0, column=0, sticky="w", padx=4, pady=7)
             return
@@ -2544,7 +2606,7 @@ class VierNexApp(BaseRoot):
                     font=ctk.CTkFont(size=12, weight="bold"),
                     command=lambda jid=job["id"]: self._retry_job(jid)
                 ).grid(row=0, column=1, rowspan=2, padx=2)
-            if job["id"] != self.current_job_id:
+            if job["id"] != current_job_id:
                 ctk.CTkButton(
                     row, text="×", width=32, height=28, fg_color="#5a2630",
                     font=ctk.CTkFont(size=12, weight="bold"),
@@ -3274,11 +3336,6 @@ class VierNexApp(BaseRoot):
                         self.status_var.set(f"Descargando · {detail}")
                         self.taskbar.set(pct, TBPF_NORMAL)
 
-                    for j in self.jobs:
-                        if j["id"] == jid:
-                            j["progress"] = pct
-                            break
-
                     self._schedule_queue_refresh()
 
                 elif kind == "status":
@@ -3446,5 +3503,3 @@ if __name__ == "__main__":
             )
         except Exception:
             raise
-
-
